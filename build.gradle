@@ -1,0 +1,97 @@
+buildscript {
+    ext {
+        springBootVersion = "2.7.11"
+        httpclientVersion = "4.5.14"
+        aerospikeClientVersion = findProperty("aerospikeClientVersion") ?: "7.0.0"
+        set('snakeyaml.version', '2.0') // Can be removed after upgrading to springboot 3.x
+    }
+    if (findProperty("aerospikeUseLocal")) {
+        print("using Local repo")
+        repositories {
+            mavenLocal()
+        }
+    }
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
+    }
+}
+
+plugins {
+    id("org.springdoc.openapi-gradle-plugin") version "1.6.0"
+    id 'com.palantir.git-version' version "0.15.0"
+}
+
+if (findProperty("aerospikeUseLocal")) {
+    print("using Local repo")
+    repositories {
+        mavenLocal()
+    }
+}
+repositories {
+    mavenCentral()
+}
+
+apply plugin: "java"
+apply plugin: "eclipse"
+apply plugin: "org.springframework.boot"
+apply plugin: "io.spring.dependency-management"
+
+group = "com.aerospike"
+sourceCompatibility = 17
+
+def gitVersionDetails = versionDetails()
+def gitVersion = gitVersionDetails.lastTag
+if (gitVersionDetails.commitDistance != 0) {
+    gitVersion = gitVersion + "-" + gitVersionDetails.commitDistance + "-" + gitVersionDetails.gitHash
+}
+version = gitVersion
+
+bootJar {
+    baseName "${jarBaseName}"
+}
+jar {
+    baseName "${jarBaseName}"
+}
+test {
+    testLogging {
+        events "passed", "skipped", "failed"
+    }
+}
+springBoot {
+    buildInfo()
+}
+
+openApi {
+    customBootRun {
+        args.set(["--aerospike.restclient.requireAuthentication=true"])
+    }
+}
+
+dependencies {
+    implementation('org.msgpack:msgpack-core:0.9.3')
+    implementation('org.springframework.boot:spring-boot-starter-web:3.0.6')
+    // Separately upgraded to fix vulnerability. Version should be removed after upgrading to spring-boot 3.x
+    implementation("com.aerospike:aerospike-client:${aerospikeClientVersion}")
+    implementation("com.aerospike:aerospike-document-api:1.2.0")
+    implementation("org.msgpack:jackson-dataformat-msgpack:0.9.3")
+    implementation('org.springframework.retry:spring-retry:2.0.1')
+    implementation('org.springframework:spring-aspects:6.0.6')
+    implementation("org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j:2.1.7")
+    implementation('org.springdoc:springdoc-openapi-ui:1.6.14')
+    implementation("javax.inject:javax.inject:1")
+    implementation("com.google.guava:guava:31.1-jre")
+    implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("org.apache.httpcomponents:httpclient:${httpclientVersion}")
+    implementation('org.springframework.boot:spring-boot-starter-actuator')
+    implementation('io.github.resilience4j:resilience4j-micrometer:1.7.1')
+    implementation('io.micrometer:micrometer-registry-prometheus')
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
+}
+
+compileJava {
+    options.compilerArgs << '-parameters'
+}
